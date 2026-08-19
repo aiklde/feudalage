@@ -473,6 +473,10 @@ b {
   box-shadow: inset -1px 0 0 var(--bg);
 }
 
+.cell:hover {
+  filter: brightness(1.16);
+}
+
 .cell[data-job="food"] { background: var(--food); }
 .cell[data-job="wood"] { background: var(--wood); }
 .cell[data-job="gold"] { background: var(--gold); }
