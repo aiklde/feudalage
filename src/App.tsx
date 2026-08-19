@@ -113,10 +113,6 @@ export function App() {
   return (
     <div className="app">
       <aside className="rail">
-        <div className="brand">
-          <h1>Feudal Age</h1>
-          <p>Build order modeling tool</p>
-        </div>
 
         <section className="block">
           <h2>Dark Age Economy</h2>
@@ -132,7 +128,6 @@ export function App() {
         </section>
 
         <section className="block">
-          <h2>Army</h2>
           {input.lines.map((line, index) => (
             <div key={index} className="army-line">
             <div className="unit-row">
