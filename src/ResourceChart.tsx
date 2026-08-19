@@ -11,7 +11,7 @@ const SKY_DIM = "var(--sky-dim)";
 const AXIS = "var(--muted)";
 const GRID = "#2a2a2a";
 const INK = "var(--ink)";
-const FONT = "Inter, sans-serif";
+const FONT = "Archivo, sans-serif";
 const LABEL = 9;
 
 export const CHART_W = 900;
