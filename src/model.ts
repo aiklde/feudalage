@@ -48,6 +48,14 @@ export function usesBarracks(unit: UnitId): boolean {
   return unit === "maa" || unit === "spearman";
 }
 
+type BuildingKind = "barracks" | "stable" | "range";
+
+export function buildingKind(unit: UnitId): BuildingKind {
+  if (unit === "maa" || unit === "spearman") return "barracks";
+  if (unit === "scout") return "stable";
+  return "range";
+}
+
 export function armyCountLabel(unit: UnitId): string {
   if (unit === "maa") return "Men-at-Arms";
   if (unit === "spearman") return "Spearmen";
@@ -141,7 +149,7 @@ export interface ModelResult {
   woodBrokeAt: number | null;
   woodBrokePop: number | null;
   woodBrokeReason: string | null;
-  delayedProduction: { paidAt: number | null }[];
+  delayedProduction: { paidAt: number | null; shortfall: boolean }[];
 }
 
 const FEUDAL_RESEARCH = 130;
@@ -296,31 +304,38 @@ export function simulate(input: ModelInput): ModelResult {
   ];
 
   const producers: {
-    unit: UnitId;
+    kind: BuildingKind;
+    unit: UnitId | null;
     remaining: number;
     queued: boolean;
     paid: boolean;
     needsBuilding: boolean;
-    target: number;
+    extra: boolean;
   }[] = [];
-  let freeBarracks = 1;
+  const kindCount: Record<BuildingKind, number> = { barracks: 0, stable: 0, range: 0 };
   for (const line of lines) {
-    for (let i = 0; i < line.buildings; i++) {
-      const needsBuilding = !(usesBarracks(line.unit) && freeBarracks > 0);
-      if (!needsBuilding) freeBarracks -= 1;
+    const kind = buildingKind(line.unit);
+    if (kind === "barracks") kindCount[kind] = Math.max(kindCount[kind], line.buildings);
+    else kindCount[kind] += line.buildings;
+  }
+  for (const kind of ["barracks", "stable", "range"] as const) {
+    for (let i = 0; i < kindCount[kind]; i++) {
+      const needsBuilding = kind !== "barracks" || i > 0;
+      const extra = kind === "barracks" ? i > 1 : i > 0;
       producers.push({
-        unit: line.unit,
+        kind,
+        unit: null,
         remaining: 0,
         queued: false,
         paid: !needsBuilding,
         needsBuilding,
-        target: unitHasCount(line.unit) ? Math.max(0, line.count ?? DEFAULT_ARMY_COUNT) : Infinity,
+        extra,
       });
     }
   }
   const buildingWood = BUILDING_WOOD * producers.filter((p) => p.needsBuilding).length;
   const armyCounts: Partial<Record<UnitId, number>> = {};
-  const delayedProduction: { paidAt: number | null }[] = [];
+  const delayedProduction: { paidAt: number | null; shortfall: boolean }[] = [];
 
   let canClickAt: number | null = null;
   let blacksmithAt: number | null = null;
@@ -434,6 +449,46 @@ export function simulate(input: ModelInput): ModelResult {
   };
   const axe = () => techs.find((tech) => tech.key === "axe");
   const woodRate = () => (axe()?.done ? GATHER_RATES.woodAxe : GATHER_RATES.wood);
+  const lineTarget = (line: ArmyLine) =>
+    unitHasCount(line.unit) ? Math.max(0, line.count ?? DEFAULT_ARMY_COUNT) : Infinity;
+  const inFlight = (unit: UnitId) => producers.filter((p) => p.queued && p.unit === unit).length;
+  const underTarget = (line: ArmyLine) => (armyCounts[line.unit] ?? 0) + inFlight(line.unit) < lineTarget(line);
+  const linesFor = (kind: BuildingKind) => lines.filter((line) => buildingKind(line.unit) === kind);
+  const hasDemand = (kind: BuildingKind, maaReady: boolean) =>
+    linesFor(kind).some((line) => (line.unit !== "maa" || maaReady) && underTarget(line));
+  const pickUnit = (kind: BuildingKind, maaReady: boolean): UnitId | null => {
+    for (const line of linesFor(kind)) {
+      if (line.unit === "maa" && !maaReady) continue;
+      if (!underTarget(line)) continue;
+      const unit = UNITS[line.unit];
+      if (food >= unit.food && gold >= unit.gold && wood >= unit.wood) return line.unit;
+    }
+    return null;
+  };
+  const noteDelayed = () => {
+    if (!delayedProduction.some((d) => d.paidAt === null && d.shortfall)) {
+      delayedProduction.push({ paidAt: null, shortfall: true });
+    }
+  };
+  const payProducer = (p: (typeof producers)[number], at: number, delayed: boolean) => {
+    spendWood(BUILDING_WOOD, at, delayed ? "a production building" : "Feudal buildings");
+    p.paid = true;
+    if (!delayed) return;
+    let slot = delayedProduction.findIndex((d) => d.paidAt === null);
+    if (slot < 0) {
+      delayedProduction.push({ paidAt: at, shortfall: false });
+      slot = delayedProduction.length - 1;
+    } else {
+      delayedProduction[slot].paidAt = at;
+    }
+    const label =
+      scoutIntoArchers && p.kind === "range"
+        ? "Archery range (175w)"
+        : delayedProduction[slot].shortfall || slot === 0
+          ? "Second production building (175w, delayed)"
+          : "Extra production building (175w, delayed)";
+    milestones.push({ t: at, label, tone: "wood" });
+  };
 
   samples.push(snapshot(0));
 
@@ -450,20 +505,19 @@ export function simulate(input: ModelInput): ModelResult {
       const parts: string[] = [];
       let paidNow = 0;
       const payOrder = [...producers].sort(
-        (a, b) => Number(b.unit === "scout") - Number(a.unit === "scout"),
+        (a, b) => Number(b.kind === "stable") - Number(a.kind === "stable"),
       );
       for (const p of payOrder) {
-        if (p.paid) continue;
-        if (scoutIntoArchers && p.unit === "archer") {
-          delayedProduction.push({ paidAt: null });
+        if (p.paid || p.extra) continue;
+        if (scoutIntoArchers && p.kind === "range") {
+          noteDelayed();
           continue;
         }
         if (wood >= BUILDING_WOOD) {
-          spendWood(BUILDING_WOOD, t, "Feudal buildings");
-          p.paid = true;
+          payProducer(p, t, false);
           paidNow += 1;
         } else {
-          delayedProduction.push({ paidAt: null });
+          noteDelayed();
         }
       }
       if (paidNow > 0) parts.push(`${paidNow}× ${BUILDING_WOOD}w production`);
@@ -518,34 +572,78 @@ export function simulate(input: ModelInput): ModelResult {
     }
 
     const placingFood = producingVil && input.assignment[assignmentIndex] === "food";
+    const canPayBuilding = () => wood >= BUILDING_WOOD + (placingFood ? FARM_WOOD : 0);
+
+    const armyOnline = feudal && t >= FEUDAL_RESEARCH + ARMY_DELAY;
+    const maaReady = !needsMaa || Boolean(techs.find((tech) => tech.key === "maa")?.done);
 
     if (feudal) {
+      const payOrder = [...producers].sort(
+        (a, b) => Number(b.kind === "stable") - Number(a.kind === "stable"),
+      );
+      for (const p of payOrder) {
+        if (p.paid || p.extra) continue;
+        if (scoutIntoArchers && p.kind === "range" && goldVils < 1) continue;
+        if (canPayBuilding()) payProducer(p, t, true);
+        else if (wood < BUILDING_WOOD) noteDelayed();
+      }
+    }
+
+    if (armyOnline) {
       for (const p of producers) {
-        if (p.paid) continue;
-        if (scoutIntoArchers && p.unit === "archer" && goldVils < 1) continue;
-        if (wood >= BUILDING_WOOD && !placingFood) {
-          const slot = delayedProduction.findIndex((d) => d.paidAt === null);
-          spendWood(BUILDING_WOOD, t, "a production building");
-          p.paid = true;
-          if (slot >= 0) delayedProduction[slot].paidAt = t;
-          const label =
-            scoutIntoArchers && p.unit === "archer"
-              ? "Archery range (175w)"
-              : slot <= 0
-                ? "Second production building (175w, delayed)"
-                : "Extra production building (175w, delayed)";
-          milestones.push({ t, label, tone: "wood" });
+        if (!p.queued) continue;
+        p.remaining -= 1;
+        if (p.remaining <= 0 && p.unit) {
+          p.queued = false;
+          armyCounts[p.unit] = (armyCounts[p.unit] ?? 0) + 1;
+          p.unit = null;
+        }
+      }
+      const tryTrain = (p: (typeof producers)[number]) => {
+        if (!p.paid || p.queued) return;
+        const id = pickUnit(p.kind, maaReady);
+        if (!id) {
+          const wantsGold = linesFor(p.kind).some(
+            (line) => underTarget(line) && UNITS[line.unit].gold > 0 && gold < UNITS[line.unit].gold,
+          );
+          if (wantsGold) starvedTicks += 1;
+          return;
+        }
+        const unit = UNITS[id];
+        if (!ensureHousing(livePop() + 1, t) || wood < unit.wood) return;
+        spend(t, unit.food, unit.wood, unit.gold);
+        p.unit = id;
+        p.queued = true;
+        p.remaining = unit.trainTime;
+      };
+      for (const p of producers) tryTrain(p);
+      for (const p of producers) {
+        if (p.paid || !p.extra) continue;
+        const paidOfKind = producers.filter((x) => x.kind === p.kind && x.paid);
+        const busy = paidOfKind.length > 0 && paidOfKind.every((x) => x.queued);
+        if (!busy || !hasDemand(p.kind, maaReady)) continue;
+        if (canPayBuilding()) {
+          payProducer(p, t, true);
+          tryTrain(p);
+        } else if (wood < BUILDING_WOOD) {
+          noteDelayed();
         }
       }
     }
 
-    const extraDeclared = producers.filter((p) => p.needsBuilding).length;
-    const secondDeclared = extraDeclared >= 2;
-    const secondPaid = producers.filter((p) => p.needsBuilding && p.paid).length >= 2;
+    const extraPending = producers.some((p) => {
+      if (!p.extra || p.paid) return false;
+      if (!armyOnline) return true;
+      const paidOfKind = producers.filter((x) => x.kind === p.kind && x.paid);
+      const busy = paidOfKind.length > 0 && paidOfKind.every((x) => x.queued);
+      return busy && hasDemand(p.kind, maaReady);
+    });
+    const primaryPending = producers.some((p) => p.needsBuilding && !p.extra && !p.paid);
+    const holdForBuildings = primaryPending || extraPending;
     const payBlacksmith = () => {
       if (!feudal || blacksmithPaid || wood < BLACKSMITH_WOOD || placingFood) return;
       if (!goldCampPaid) return;
-      if (secondDeclared && !secondPaid) return;
+      if (holdForBuildings) return;
       spend(t, 0, BLACKSMITH_WOOD, 0, "a blacksmith");
       blacksmithPaid = true;
       blacksmithAt = t;
@@ -562,7 +660,7 @@ export function simulate(input: ModelInput): ModelResult {
       }
     };
 
-    if (secondDeclared) {
+    if (holdForBuildings) {
       payBlacksmith();
       payOpeningFarms();
     } else {
@@ -610,35 +708,6 @@ export function simulate(input: ModelInput): ModelResult {
             if (tech.requiresBlacksmith) smithBusy = false;
             if (millTech(tech)) millBusy = false;
           }
-        }
-      }
-    }
-
-    const armyOnline = feudal && t >= FEUDAL_RESEARCH + ARMY_DELAY;
-    if (armyOnline) {
-      const maaReady = !needsMaa || Boolean(techs.find((tech) => tech.key === "maa")?.done);
-      for (const p of producers) {
-        const unit = UNITS[p.unit];
-        if (p.queued) {
-          p.remaining -= 1;
-          if (p.remaining <= 0) {
-            p.queued = false;
-            armyCounts[p.unit] = (armyCounts[p.unit] ?? 0) + 1;
-          }
-        } else if (
-          p.paid &&
-          (p.unit !== "maa" || maaReady) &&
-          (armyCounts[p.unit] ?? 0) + producers.filter((x) => x.unit === p.unit && x.queued).length < p.target &&
-          food >= unit.food &&
-          gold >= unit.gold &&
-          wood >= unit.wood
-        ) {
-          if (!ensureHousing(livePop() + 1, t) || wood < unit.wood) continue;
-          spend(t, unit.food, unit.wood, unit.gold);
-          p.queued = true;
-          p.remaining = unit.trainTime;
-        } else if (unit.gold > 0 && gold < unit.gold) {
-          starvedTicks += 1;
         }
       }
     }

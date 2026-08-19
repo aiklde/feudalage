@@ -309,7 +309,7 @@ export function App() {
           </div>
         </header>
 
-        {result.delayedProduction.length > 0 && (
+        {result.delayedProduction.some((d) => d.shortfall) && (
           <div className="eco-note" role="status">
             <strong>
               {result.delayedProduction.length === 1
@@ -457,10 +457,11 @@ export function App() {
               <p>
                 Each production building is 175 wood at Feudal. Wood enters Feudal 175 lower (barracks already paid), with
                 no drop on the chart. Men-at-arms and spearmen train from that barracks and do not need another production
-                building. Extra stables or ranges wait until 175 wood is free. Opening food villagers plant 60 wood farms
-                gradually from 10:00 so all are on farms by 15:30. If a second production building is declared, the
-                blacksmith waits until that building is paid. Blacksmith (150 wood) is built automatically once 150 wood is
-                free and a villager is not being sent to food.
+                building. Extra stables or ranges are only paid if a second building actually starts producing, and they wait
+                until 175 wood is free. Opening food villagers plant 60 wood farms gradually from 10:00 so all are on farms by
+                15:30. If a second production building is declared, the blacksmith waits until that building is paid or it is
+                clear it will not be used. Blacksmith (150 wood) is built automatically once 150 wood is free and a villager
+                is not being sent to food.
               </p>
               <p>
                 Each new food villager plants a 60 wood farm. Opening food villagers who are not on farms yet also plant
