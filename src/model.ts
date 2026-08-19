@@ -130,6 +130,7 @@ export interface ModelResult {
   canClickAt: number | null;
   castleArriveAt: number | null;
   blacksmithAt: number | null;
+  horseCollarAt: number | null;
   final: Sample;
   armyProduced: Partial<Record<UnitId, number>>;
   buildingWood: number;
@@ -322,6 +323,7 @@ export function simulate(input: ModelInput): ModelResult {
 
   let canClickAt: number | null = null;
   let blacksmithAt: number | null = null;
+  let horseCollarAt: number | null = null;
   let woodBrokeAt: number | null = null;
   let woodBrokePop: number | null = null;
   let woodBrokeReason: string | null = null;
@@ -569,24 +571,40 @@ export function simulate(input: ModelInput): ModelResult {
     }
 
     if (feudal) {
+      const millTech = (tech: Tech) => tech.key === "axe" || tech.key === "horseCollar";
       let smithBusy = techs.some((tech) => tech.requiresBlacksmith && tech.researching);
+      let millBusy = techs.some((tech) => millTech(tech) && tech.researching);
       for (const tech of techs) {
         const smithOk = !tech.requiresBlacksmith || (blacksmithPaid && !smithBusy);
+        const millOk = !millTech(tech) || !millBusy;
         if (
           tech.enabled &&
           !tech.done &&
           !tech.researching &&
           smithOk &&
+          millOk &&
           food >= tech.food &&
           wood >= tech.wood &&
           gold >= tech.gold
         ) {
+          samples.push(snapshot(t));
           food -= tech.food;
           wood -= tech.wood;
           gold -= tech.gold;
+          samples.push(snapshot(t));
           tech.researching = true;
           tech.progress = 0;
           if (tech.requiresBlacksmith) smithBusy = true;
+          if (millTech(tech)) millBusy = true;
+          if (tech.key === "horseCollar") horseCollarAt = t;
+          const cost = [
+            tech.food ? `${tech.food}f` : null,
+            tech.wood ? `${tech.wood}w` : null,
+            tech.gold ? `${tech.gold}g` : null,
+          ]
+            .filter(Boolean)
+            .join(" ");
+          milestones.push({ t, label: `${tech.label} (${cost})`, tone: tech.tone });
         }
         if (tech.researching) {
           tech.progress += 1;
@@ -594,7 +612,7 @@ export function simulate(input: ModelInput): ModelResult {
             tech.researching = false;
             tech.done = true;
             if (tech.requiresBlacksmith) smithBusy = false;
-            milestones.push({ t, label: tech.label, tone: tech.tone });
+            if (millTech(tech)) millBusy = false;
           }
         }
       }
@@ -643,6 +661,7 @@ export function simulate(input: ModelInput): ModelResult {
     canClickAt,
     castleArriveAt: canClickAt === null ? null : canClickAt + CASTLE_RESEARCH,
     blacksmithAt,
+    horseCollarAt,
     final,
     armyProduced: { ...armyCounts },
     buildingWood,

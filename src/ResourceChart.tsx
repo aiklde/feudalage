@@ -183,6 +183,10 @@ export function ResourceChart({
   const yTickValues: number[] = [];
   for (let v = yMin; v <= yMax; v += yStep) yTickValues.push(v);
   const viablePop = result.ticks.find((tick) => tick.viable)?.pop;
+  const horseCollarAfter =
+    result.horseCollarAt === null
+      ? undefined
+      : result.samples.filter((s) => s.t === result.horseCollarAt).at(-1);
   const blacksmithAfter =
     result.blacksmithAt === null
       ? undefined
@@ -202,6 +206,9 @@ export function ResourceChart({
     if (delayedBuilding) {
       list.push({ id: "range", sample: delayedBuilding, label: "2nd building −175w", color: WOOD });
     }
+    if (horseCollarAfter) {
+      list.push({ id: "collar", sample: horseCollarAfter, label: "Horse Collar −75f −75w", color: WOOD });
+    }
     if (blacksmithAfter) {
       list.push({ id: "smith", sample: blacksmithAfter, label: "Blacksmith −150w", color: WOOD });
     }
@@ -209,7 +216,7 @@ export function ResourceChart({
       list.push({ id: "broke", sample: woodBreak, label: "Economy broken", color: FOOD });
     }
     return placeMarks(list, x, y, pad, W, H);
-  }, [blacksmithAfter, delayedBuilding, woodBreak, x, y, pad, W, H]);
+  }, [blacksmithAfter, delayedBuilding, horseCollarAfter, woodBreak, x, y, pad, W, H]);
 
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const pt = pointerToSvg(e.currentTarget, e.clientX, e.clientY);
