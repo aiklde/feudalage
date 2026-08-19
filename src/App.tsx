@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { ResourceChart, CHART_W, CHART_PAD_L, CHART_PAD_R, chartPopRange } from "./ResourceChart";
 import {
   GATHER_RATES,
-  MAA_UPGRADE,
   UNITS,
   DEFAULT_ARMY_COUNT,
   armyCountLabel,
@@ -86,7 +85,6 @@ export function App() {
   const opening = input.foodVils + input.woodVils + input.goldVils + input.builderVils;
   const { popMin, popMax } = chartPopRange(result);
   const popSpan = Math.max(1, popMax - popMin);
-  const totalVils = result.final.foodVils + result.final.woodVils + result.final.goldVils + result.final.idleVils;
   const delayedPaidAt = result.delayedProduction[0]?.paidAt ?? null;
   const set = (patch: Partial<ModelInput>) => setInput((prev) => ({ ...prev, ...patch }));
   const setLine = (index: number, patch: Partial<ArmyLine>) => {
@@ -479,19 +477,6 @@ export function App() {
           )}
         </section>
       </main>
-    </div>
-  );
-}
-
-function Mix({ label, color, n, total }: { label: string; color: string; n: number; total: number }) {
-  const pct = total === 0 ? 0 : (n / total) * 100;
-  return (
-    <div className="mix-row">
-      <span>{label}</span>
-      <div className="bar">
-        <i style={{ width: `${pct}%`, background: color }} />
-      </div>
-      <span>{n}</span>
     </div>
   );
 }
