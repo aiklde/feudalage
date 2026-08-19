@@ -412,7 +412,7 @@ export function simulate(input: ModelInput): ModelResult {
     return n;
   };
 
-  const livePop = () => pop + (producingVil ? 1 : 0) + armyHeadcount();
+  const livePop = () => pop + armyHeadcount();
 
   const ensureHousing = (needed: number): boolean => {
     while (housing < needed) {
@@ -474,7 +474,6 @@ export function simulate(input: ModelInput): ModelResult {
       vilProgress += 1;
       if (vilProgress >= vilTime) {
         producingVil = false;
-        pop += 1;
         vilsProduced += 1;
         const job = input.assignment[assignmentIndex] ?? "food";
         assignmentIndex += 1;
@@ -505,6 +504,7 @@ export function simulate(input: ModelInput): ModelResult {
       food -= VIL_FOOD;
       producingVil = true;
       vilProgress = 0;
+      pop += 1;
     }
 
     const placingFood = producingVil && input.assignment[assignmentIndex] === "food";
