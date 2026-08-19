@@ -286,6 +286,53 @@ b {
   margin-bottom: 20px;
 }
 
+.unit-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.unit-row .field {
+  margin-top: 0;
+}
+
+.unit-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.buildings-field {
+  flex: 0 0 auto;
+}
+
+.buildings-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  background: var(--bg-2);
+  padding: 9px 6px;
+  min-width: 72px;
+}
+
+.buildings-box strong {
+  min-width: 1.2em;
+  text-align: center;
+}
+
+.buildings-box button {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.buildings-box button:hover {
+  color: var(--ink);
+}
+
 .rates {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

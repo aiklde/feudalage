@@ -127,7 +127,7 @@ export function App() {
             <Stepper label="Builders" job="idle" value={input.builderVils} onChange={(builderVils) => set({ builderVils })} />
           </div>
           <p className="chart-caption" style={{ marginTop: 10 }}>
-            {opening} villagers at the Feudal click.
+            {opening} villagers in Dark Age.
           </p>
         </section>
 
@@ -135,7 +135,8 @@ export function App() {
           <h2>Army</h2>
           {input.lines.map((line, index) => (
             <div key={index} className="army-line">
-              <label className="field">
+            <div className="unit-row">
+              <label className="field unit-field">
                 <span>{index === 0 ? "Unit" : "Second unit"}</span>
                 <select
                   value={line.unit}
@@ -161,12 +162,28 @@ export function App() {
                 </select>
               </label>
               {!usesBarracks(line.unit) && (
-                <Stepper
-                  label="Buildings"
-                  value={line.buildings}
-                  onChange={(buildings) => setLine(index, { buildings: Math.max(0, buildings) })}
-                />
+                <div className="field buildings-field">
+                  <span>Buildings</span>
+                  <div className="buildings-box">
+                    <button
+                      type="button"
+                      onClick={() => setLine(index, { buildings: Math.max(0, line.buildings - 1) })}
+                      aria-label="Fewer buildings"
+                    >
+                      −
+                    </button>
+                    <strong>{line.buildings}</strong>
+                    <button
+                      type="button"
+                      onClick={() => setLine(index, { buildings: line.buildings + 1 })}
+                      aria-label="More buildings"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               )}
+            </div>
               {unitHasCount(line.unit) && (
                 <Stepper
                   label={armyCountLabel(line.unit)}
