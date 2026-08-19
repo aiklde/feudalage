@@ -104,6 +104,7 @@ export interface Sample {
   goldVils: number;
   idleVils: number;
   pop: number;
+  xPop: number;
   armyCounts: Partial<Record<UnitId, number>>;
   castleViable: boolean;
 }
@@ -364,6 +365,7 @@ export function simulate(input: ModelInput): ModelResult {
     goldVils,
     idleVils,
     pop,
+    xPop: producingVil ? pop - 1 + vilProgress / vilTime : pop,
     armyCounts: { ...armyCounts },
     castleViable,
   });
@@ -377,19 +379,25 @@ export function simulate(input: ModelInput): ModelResult {
     milestones.push({ t: at, label: `Wood economy broken (${reason})`, tone: "food" });
   };
 
+  const spend = (at: number, df: number, dw: number, dg: number, reason?: string) => {
+    if (df === 0 && dw === 0 && dg === 0) return;
+    samples.push(snapshot(at));
+    food -= df;
+    wood -= dw;
+    gold -= dg;
+    samples.push(snapshot(at));
+    if (dw > 0) noteWoodBreak(at, reason ?? "a wood spend");
+  };
+
   const spendWood = (amount: number, at: number, reason: string) => {
-    if (wood - amount < -0.5 && woodBrokeAt === null) samples.push(snapshot(at));
-    wood -= amount;
-    noteWoodBreak(at, reason);
+    spend(at, 0, amount, 0, reason);
   };
 
   const assign = (job: Job, at: number) => {
     if (job === "food") {
       foodVils += 1;
       if (wood >= FARM_WOOD) {
-        samples.push(snapshot(at));
-        wood -= FARM_WOOD;
-        samples.push(snapshot(at));
+        spend(at, 0, FARM_WOOD, 0, "a farm");
       } else {
         pendingFarms += 1;
       }
@@ -416,10 +424,10 @@ export function simulate(input: ModelInput): ModelResult {
 
   const livePop = () => pop + armyHeadcount();
 
-  const ensureHousing = (needed: number): boolean => {
+  const ensureHousing = (needed: number, at: number): boolean => {
     while (housing < needed) {
       if (wood < HOUSE_WOOD) return false;
-      wood -= HOUSE_WOOD;
+      spend(at, 0, HOUSE_WOOD, 0, "a house");
       housing += HOUSE_POP;
     }
     return true;
@@ -485,7 +493,12 @@ export function simulate(input: ModelInput): ModelResult {
 
     const onPeriod = isPeriod(t, periodStart, VIL_TRAIN);
     if (onPeriod) {
-      const viable = feudal && food >= CASTLE_FOOD && gold >= CASTLE_GOLD;
+      const affordable = feudal && food >= CASTLE_FOOD && gold >= CASTLE_GOLD;
+      if (affordable && canClickAt === null) {
+        canClickAt = t;
+        milestones.push({ t, label: "Castle Age viable (800f / 200g)", tone: "gold" });
+      }
+      const viable = affordable && t !== canClickAt;
       castleViable = viable;
       tickSnapshots.push({
         index: tickSnapshots.length,
@@ -495,15 +508,10 @@ export function simulate(input: ModelInput): ModelResult {
         gold,
         viable,
       });
-
-      if (viable && canClickAt === null) {
-        canClickAt = t;
-        milestones.push({ t, label: "Castle Age viable (800f / 200g)", tone: "gold" });
-      }
     }
 
-    if (canTrainVils && !producingVil && food >= VIL_FOOD && ensureHousing(livePop() + 1)) {
-      food -= VIL_FOOD;
+    if (canTrainVils && !producingVil && food >= VIL_FOOD && ensureHousing(livePop() + 1, t)) {
+      spend(t, VIL_FOOD, 0, 0);
       producingVil = true;
       vilProgress = 0;
       pop += 1;
@@ -517,11 +525,9 @@ export function simulate(input: ModelInput): ModelResult {
         if (scoutIntoArchers && p.unit === "archer" && goldVils < 1) continue;
         if (wood >= BUILDING_WOOD && !placingFood) {
           const slot = delayedProduction.findIndex((d) => d.paidAt === null);
-          samples.push(snapshot(t));
           spendWood(BUILDING_WOOD, t, "a production building");
           p.paid = true;
           if (slot >= 0) delayedProduction[slot].paidAt = t;
-          samples.push(snapshot(t));
           const label =
             scoutIntoArchers && p.unit === "archer"
               ? "Archery range (175w)"
@@ -540,25 +546,19 @@ export function simulate(input: ModelInput): ModelResult {
       if (!feudal || blacksmithPaid || wood < BLACKSMITH_WOOD || placingFood) return;
       if (!goldCampPaid) return;
       if (secondDeclared && !secondPaid) return;
-      samples.push(snapshot(t));
-      wood -= BLACKSMITH_WOOD;
+      spend(t, 0, BLACKSMITH_WOOD, 0, "a blacksmith");
       blacksmithPaid = true;
       blacksmithAt = t;
-      samples.push(snapshot(t));
       milestones.push({ t, label: "Blacksmith (150w)", tone: "wood" });
     };
     const payOpeningFarms = () => {
       while (openingFarmsPaid < openingFarmsDueAt(t) && wood >= FARM_WOOD && !placingFood) {
-        samples.push(snapshot(t));
-        wood -= FARM_WOOD;
+        spend(t, 0, FARM_WOOD, 0, "a farm");
         openingFarmsPaid += 1;
-        samples.push(snapshot(t));
       }
       while (pendingFarms > 0 && wood >= FARM_WOOD && !placingFood) {
-        samples.push(snapshot(t));
-        wood -= FARM_WOOD;
+        spend(t, 0, FARM_WOOD, 0, "a farm");
         pendingFarms -= 1;
-        samples.push(snapshot(t));
       }
     };
 
@@ -587,11 +587,7 @@ export function simulate(input: ModelInput): ModelResult {
           wood >= tech.wood &&
           gold >= tech.gold
         ) {
-          samples.push(snapshot(t));
-          food -= tech.food;
-          wood -= tech.wood;
-          gold -= tech.gold;
-          samples.push(snapshot(t));
+          spend(t, tech.food, tech.wood, tech.gold);
           tech.researching = true;
           tech.progress = 0;
           if (tech.requiresBlacksmith) smithBusy = true;
@@ -637,10 +633,8 @@ export function simulate(input: ModelInput): ModelResult {
           gold >= unit.gold &&
           wood >= unit.wood
         ) {
-          if (!ensureHousing(livePop() + 1) || wood < unit.wood) continue;
-          food -= unit.food;
-          wood -= unit.wood;
-          gold -= unit.gold;
+          if (!ensureHousing(livePop() + 1, t) || wood < unit.wood) continue;
+          spend(t, unit.food, unit.wood, unit.gold);
           p.queued = true;
           p.remaining = unit.trainTime;
         } else if (unit.gold > 0 && gold < unit.gold) {
@@ -649,7 +643,7 @@ export function simulate(input: ModelInput): ModelResult {
       }
     }
 
-    if (t % 5 === 0 || onPeriod || t === duration) samples.push(snapshot(t));
+    samples.push(snapshot(t));
   }
 
   const final = samples[samples.length - 1];
@@ -681,7 +675,8 @@ export function castleWindowTicks(input: ModelInput, autoAssign = true): number 
     ? extendAssignment(input.assignment, MAX_NEW_VILS, input.foodVils)
     : padAssignment(input.assignment, MAX_NEW_VILS, "idle");
   const probe = simulate({ ...input, ticks: MAX_NEW_VILS, assignment });
-  const first = probe.ticks.find((tick) => tick.viable);
+  const click = probe.canClickAt;
+  const first = probe.ticks.find((tick) => tick.t === click) ?? probe.ticks.find((tick) => tick.viable);
   if (!first) return MAX_NEW_VILS;
   const minNew = Math.max(first.index + 1, first.pop - opening);
   return Math.min(MAX_NEW_VILS, Math.max(1, minNew + CASTLE_EXTRA_VILS));

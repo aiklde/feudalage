@@ -1,4 +1,4 @@
-import { useMemo, useState, type PointerEvent } from "react";
+import { useMemo, useState, type PointerEvent, type ReactNode } from "react";
 import type { ModelResult, Sample, UnitId } from "./model";
 import { UNITS, formatClock } from "./model";
 
@@ -14,6 +14,17 @@ const INK = "var(--ink)";
 const FONT = "Inter, sans-serif";
 const LABEL = 9;
 
+export const CHART_W = 900;
+export const CHART_PAD_L = 48;
+export const CHART_PAD_R = 16;
+
+export function chartPopRange(result: ModelResult): { popMin: number; popMax: number } {
+  const xs = result.samples.map((s) => s.xPop);
+  const popMin = xs[0] ?? result.samples[0]?.pop ?? 0;
+  const popMax = Math.max(popMin + 1, ...xs);
+  return { popMin, popMax };
+}
+
 function armyHover(counts: Partial<Record<UnitId, number>>): string {
   const parts = (Object.entries(counts) as [UnitId, number][])
     .filter(([, n]) => n > 0)
@@ -28,7 +39,7 @@ function pathFor(
   y: (v: number) => number,
 ): string {
   return samples
-    .map((s, i) => `${i === 0 ? "M" : "L"}${x(s.pop).toFixed(1)},${y(s[key] as number).toFixed(1)}`)
+    .map((s, i) => `${i === 0 ? "M" : "L"}${x(s.xPop).toFixed(1)},${y(s[key] as number).toFixed(1)}`)
     .join(" ");
 }
 
@@ -43,7 +54,7 @@ function areaFor(
   const line = pathFor(samples, key, x, y);
   const last = samples[samples.length - 1];
   const first = samples[0];
-  return `${line} L${x(last.pop).toFixed(1)},${zero} L${x(first.pop).toFixed(1)},${zero} Z`;
+  return `${line} L${x(last.xPop).toFixed(1)},${zero} L${x(first.xPop).toFixed(1)},${zero} Z`;
 }
 
 function axisPops(min: number, max: number): number[] {
@@ -91,7 +102,7 @@ function placeMarks(
   H: number,
 ): PlacedMark[] {
   const placed: PlacedMark[] = marks.map((mark) => {
-    const ax = x(mark.sample.pop);
+    const ax = x(mark.sample.xPop);
     const ay = y(mark.sample.wood);
     return {
       ...mark,
@@ -151,20 +162,20 @@ export function ResourceChart({
   result,
   gameStartOffset,
   onHover,
+  axis,
 }: {
   result: ModelResult;
   gameStartOffset: number;
   onHover?: (sample: Sample | null) => void;
+  axis?: ReactNode;
 }) {
   const [hover, setHover] = useState<{ sample: Sample; x: number } | null>(null);
-  const W = 900;
+  const W = CHART_W;
   const H = 280;
-  const pad = { l: 48, r: 16, t: 18, b: 32 };
+  const pad = { l: CHART_PAD_L, r: CHART_PAD_R, t: 18, b: 6 };
 
   const { x, y, yMax, yMin, popMin, popMax } = useMemo(() => {
-    const pops = result.samples.map((s) => s.pop);
-    const popMin = pops[0] ?? 0;
-    const popMax = Math.max(popMin + 1, ...pops);
+    const { popMin, popMax } = chartPopRange(result);
     const peak = Math.max(
       50,
       ...result.samples.flatMap((s) => [s.food, s.wood, s.gold]),
@@ -182,7 +193,9 @@ export function ResourceChart({
   const yStep = yMax - yMin > 1000 ? 200 : 100;
   const yTickValues: number[] = [];
   for (let v = yMin; v <= yMax; v += yStep) yTickValues.push(v);
-  const viablePop = result.ticks.find((tick) => tick.viable)?.pop;
+  const viablePop = result.canClickAt === null
+    ? undefined
+    : result.ticks.find((tick) => tick.t === result.canClickAt)?.pop;
   const horseCollarAfter =
     result.horseCollarAt === null
       ? undefined
@@ -225,7 +238,7 @@ export function ResourceChart({
     let best = result.samples[0];
     let dist = Infinity;
     for (const s of result.samples) {
-      const d = Math.abs(x(s.pop) - scanX);
+      const d = Math.abs(x(s.xPop) - scanX);
       if (d < dist || (d === dist && s.t > best.t)) {
         dist = d;
         best = s;
@@ -256,12 +269,14 @@ export function ResourceChart({
           </g>
         ))}
         {axisPops(popMin, popMax).map((pop) => (
-          <g key={`pop-${pop}`}>
-            <line x1={x(pop)} x2={x(pop)} y1={pad.t} y2={H - pad.b} stroke={GRID} />
-            <text x={x(pop)} y={H - 10} textAnchor="middle" fill={AXIS} fontSize={LABEL} fontFamily={FONT} fontWeight="300">
-              {pop}
-            </text>
-          </g>
+          <line
+            key={`pop-${pop}`}
+            x1={x(pop)}
+            x2={x(pop)}
+            y1={pad.t}
+            y2={H - pad.b}
+            stroke={GRID}
+          />
         ))}
         <path d={areaFor(result.samples, "food", x, y, zero)} fill={FOOD_DIM} />
         {result.ticks.map((tick, i) => {
@@ -314,10 +329,8 @@ export function ResourceChart({
         {hover && (
           <line x1={hover.x} x2={hover.x} y1={pad.t} y2={H - pad.b} stroke={INK} strokeOpacity="0.35" />
         )}
-        <text x={(pad.l + W - pad.r) / 2} y={H - 1} textAnchor="middle" fill={AXIS} fontSize={LABEL} fontFamily={FONT} fontWeight="300">
-          Villagers
-        </text>
       </svg>
+      {axis}
       <div className="hover-readout">
         {hover
           ? `${hover.sample.pop} vils  ${formatClock(gameStartOffset + hover.sample.t)}  food ${Math.round(hover.sample.food)}  wood ${Math.round(hover.sample.wood)}  gold ${Math.round(hover.sample.gold)}${armyHover(hover.sample.armyCounts)}${hover.sample.castleViable ? "  castle viable" : ""}${hover.sample.wood < 0 ? "  wood broken" : ""}`

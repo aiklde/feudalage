@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ResourceChart } from "./ResourceChart";
+import { ResourceChart, CHART_W, CHART_PAD_L, CHART_PAD_R, chartPopRange } from "./ResourceChart";
 import {
   GATHER_RATES,
   MAA_UPGRADE,
@@ -84,6 +84,8 @@ export function App() {
   })();
   const eco = hoverSample ?? castleSample;
   const opening = input.foodVils + input.woodVils + input.goldVils + input.builderVils;
+  const { popMin, popMax } = chartPopRange(result);
+  const popSpan = Math.max(1, popMax - popMin);
   const totalVils = result.final.foodVils + result.final.woodVils + result.final.goldVils + result.final.idleVils;
   const delayedPaidAt = result.delayedProduction[0]?.paidAt ?? null;
   const set = (patch: Partial<ModelInput>) => setInput((prev) => ({ ...prev, ...patch }));
@@ -196,12 +198,7 @@ export function App() {
                   Remove second unit
                 </button>
               )}
-              {line.unit === "maa" && (
-                <p className="chart-caption">
-                  Man-at-Arms requires the militia upgrade ({MAA_UPGRADE.food} food, {MAA_UPGRADE.gold} gold) before
-                  any can train.
-                </p>
-              )}
+      
             </div>
           ))}
           {input.lines.length < 2 && (
@@ -281,7 +278,7 @@ export function App() {
               <div className={`v ${result.canClickAt === null ? "warn" : ""}`}>
                 {result.canClickAt === null
                   ? "—"
-                  : `${gameClock(result.canClickAt, opening)} · ${result.ticks.find((tick) => tick.viable)?.pop ?? "—"} vils`}
+                  : `${gameClock(result.canClickAt, opening)} · ${result.ticks.find((tick) => tick.t === result.canClickAt)?.pop ?? "—"} vils`}
               </div>
             </div>
             <div className="clock">
@@ -343,7 +340,7 @@ export function App() {
 
         <section className="chart-card">
           <div className="chart-head">
-            <h2>Resource banks through Feudal</h2>
+            <h2>Resources</h2>
             <div className="legend">
               <span>
                 <i className="swatch" style={{ background: "var(--food)" }} />
@@ -359,15 +356,80 @@ export function App() {
               </span>
               <span>
                 <i className="swatch" style={{ background: "var(--sky)" }} />
-                Castle viable
+                Castle Age Affordable
               </span>
             </div>
+            <div className="brushes">
+              {JOBS.map((job) => (
+                <button
+                  key={job}
+                  type="button"
+                  className="brush"
+                  data-job={job}
+                  data-on={brush === job}
+                  onClick={() => setBrush(job)}
+                >
+                  {job}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="chart-caption">
-            Villager count on the x-axis. Blue band is where Castle Age is affordable (800 food and 200 gold). Reach Castle
-            Age is 160 seconds after that first tick.
-          </p>
-          <div className="rates">
+
+          <ResourceChart
+            result={result}
+            gameStartOffset={result.gameStartOffset}
+            onHover={setHoverSample}
+            axis={
+              <div
+                className="strip-track"
+                style={{
+                  paddingLeft: `${(CHART_PAD_L / CHART_W) * 100}%`,
+                  paddingRight: `${(CHART_PAD_R / CHART_W) * 100}%`,
+                }}
+              >
+                <div
+                  className="strip"
+                  onPointerLeave={() => setPainting(false)}
+                  onPointerUp={(e) => {
+                    setPainting(false);
+                    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                      e.currentTarget.releasePointerCapture(e.pointerId);
+                    }
+                  }}
+                  onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+                >
+                  {assignment.map((job, i) => {
+                    const tick = result.ticks[i];
+                    const left = ((opening + i - popMin) / popSpan) * 100;
+                    const width = (1 / popSpan) * 100;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        className="cell"
+                        data-job={job}
+                        data-viable={tick?.viable ? "true" : "false"}
+                        style={{ left: `${left}%`, width: `${width}%` }}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          setPainting(true);
+                          paint(i);
+                        }}
+                        onPointerEnter={() => {
+                          if (painting) paint(i);
+                        }}
+                      >
+                        <span className="n">{opening + i + 1}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            }
+          />
+        </section>
+
+        <div className="rates">
             <div>
               <span>Food</span>
               <strong>{GATHER_RATES.food.toFixed(2)}/s</strong>
@@ -387,84 +449,6 @@ export function App() {
               <em>{(GATHER_RATES.gold * 60).toFixed(1)}/min</em>
             </div>
           </div>
-          <ResourceChart
-            result={result}
-            gameStartOffset={result.gameStartOffset}
-            onHover={setHoverSample}
-          />
-        </section>
-
-        <section className="painter">
-          <div className="painter-head">
-            <h2>Where each new villager goes</h2>
-            <div className="brushes">
-              {JOBS.map((job) => (
-                <button
-                  key={job}
-                  type="button"
-                  className="brush"
-                  data-job={job}
-                  data-on={brush === job}
-                  onClick={() => setBrush(job)}
-                >
-                  {job}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="chart-caption">
-            Each cell is the next Town Center villager, one 25s tick after Feudal. The strip is two villagers past the
-            first Castle Age click. A blue bar on top means Castle Age is affordable (800 food / 200 gold). First
-            villager is #{opening + 1}.
-          </p>
-          <div
-            className="strip"
-            onPointerLeave={() => setPainting(false)}
-            onPointerUp={(e) => {
-              setPainting(false);
-              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-                e.currentTarget.releasePointerCapture(e.pointerId);
-              }
-            }}
-            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
-          >
-            {assignment.map((job, i) => {
-              const tick = result.ticks[i];
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  className="cell"
-                  data-job={job}
-                  data-viable={tick?.viable ? "true" : "false"}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    setPainting(true);
-                    paint(i);
-                  }}
-                  onPointerEnter={() => {
-                    if (painting) paint(i);
-                  }}
-                >
-                  <span className="n">{opening + i + 1}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="mix">
-          <Mix label="Food" color="var(--food)" n={result.final.foodVils} total={totalVils} />
-          <Mix label="Wood" color="var(--wood)" n={result.final.woodVils} total={totalVils} />
-          <Mix label="Gold" color="var(--gold)" n={result.final.goldVils} total={totalVils} />
-          {result.final.idleVils > 0 && (
-            <Mix label="Idle" color="var(--idle)" n={result.final.idleVils} total={totalVils} />
-          )}
-          <p className="chart-caption">
-            {totalVils} villagers at the end of the window. {result.vilsProduced} trained after the click.
-          </p>
-        </section>
-
         <section className="help">
           <button
             type="button"

@@ -86,16 +86,16 @@ b {
 
 .vil-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 4px;
 }
 
 .stepper {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: left;
+  justify-content: left;
   background: var(--bg-2);
-  padding: 8px 10px;
+  padding: 4px 10px;
 }
 
 .stepper .label {
@@ -121,7 +121,7 @@ b {
 
 .stepper button {
   width: 24px;
-  height: 24px;
+  height: 10px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -336,8 +336,8 @@ b {
 .rates {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  margin: 8px 0 20px;
+  gap: 8px;
+  margin: 8px 0 8px;
   padding: 0;
 }
 
@@ -355,7 +355,7 @@ b {
 }
 
 .rates strong {
-  font-size: 19px;
+  font-size: 11px;
 }
 
 .rates em {
@@ -374,6 +374,7 @@ b {
   align-items: baseline;
   margin-bottom: 16px;
   gap: 24px;
+  flex-wrap: wrap;
 }
 
 .chart-head h2 {
@@ -412,27 +413,12 @@ b {
 .hover-readout {
   font-size: 9px;
   color: var(--muted);
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
-.painter {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.painter-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.painter-head h2 {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 300;
+.strip-track {
+  box-sizing: border-box;
+  margin-top: 2px;
 }
 
 .brushes {
@@ -465,18 +451,19 @@ b {
 }
 
 .strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(28px, 1fr));
-  gap: 3px;
+  position: relative;
+  height: 48px;
   user-select: none;
 }
 
 .cell {
+  position: absolute;
+  top: 0;
   height: 48px;
   border: 0;
   cursor: pointer;
   background: #2a2a2a;
-  position: relative;
+  box-shadow: inset -1px 0 0 var(--bg);
 }
 
 .cell[data-job="food"] { background: var(--food); }
