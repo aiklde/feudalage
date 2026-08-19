@@ -352,20 +352,6 @@ export function App() {
                 Castle Age Affordable
               </span>
             </div>
-            <div className="brushes">
-              {JOBS.map((job) => (
-                <button
-                  key={job}
-                  type="button"
-                  className="brush"
-                  data-job={job}
-                  data-on={brush === job}
-                  onClick={() => setBrush(job)}
-                >
-                  {job}
-                </button>
-              ))}
-            </div>
           </div>
 
           <ResourceChart
@@ -416,6 +402,21 @@ export function App() {
                       </button>
                     );
                   })}
+                </div>
+                <div className="brushes">
+                  <span className="brushes-label">Change each villager's job</span>
+                  {JOBS.map((job) => (
+                    <button
+                      key={job}
+                      type="button"
+                      className="brush"
+                      data-job={job}
+                      data-on={brush === job}
+                      onClick={() => setBrush(job)}
+                    >
+                      {job === "food" ? "Food" : job === "wood" ? "Wood" : "Gold"}
+                    </button>
+                  ))}
                 </div>
               </div>
             }

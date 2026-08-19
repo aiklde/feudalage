@@ -426,6 +426,13 @@ b {
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+  margin-top: 8px;
+}
+
+.brushes-label {
+  margin-right: 4px;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .brush {
