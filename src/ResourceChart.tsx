@@ -12,6 +12,7 @@ const AXIS = "var(--muted)";
 const GRID = "#2a2a2a";
 const INK = "var(--ink)";
 const FONT = "Inter, sans-serif";
+const LABEL = 9;
 
 function armyHover(counts: Partial<Record<UnitId, number>>): string {
   const parts = (Object.entries(counts) as [UnitId, number][])
@@ -103,7 +104,7 @@ function placeMarks(
   });
   placed.sort((a, b) => a.ax - b.ax || a.ay - b.ay);
 
-  const labelWidth = (label: string) => label.length * 6.2;
+  const labelWidth = (label: string) => label.length * 5.1;
   const minY = pad.t + 12;
   const maxY = H - pad.b - 4;
 
@@ -242,7 +243,7 @@ export function ResourceChart({
         {yTickValues.map((v) => (
           <g key={v}>
             <line x1={pad.l} x2={W - pad.r} y1={y(v)} y2={y(v)} stroke={GRID} />
-            <text x={pad.l - 8} y={y(v) + 3} textAnchor="end" fill={AXIS} fontSize="11" fontFamily={FONT} fontWeight="300">
+            <text x={pad.l - 8} y={y(v) + 3} textAnchor="end" fill={AXIS} fontSize={LABEL} fontFamily={FONT} fontWeight="300">
               {v}
             </text>
           </g>
@@ -250,7 +251,7 @@ export function ResourceChart({
         {axisPops(popMin, popMax).map((pop) => (
           <g key={`pop-${pop}`}>
             <line x1={x(pop)} x2={x(pop)} y1={pad.t} y2={H - pad.b} stroke={GRID} />
-            <text x={x(pop)} y={H - 10} textAnchor="middle" fill={AXIS} fontSize="11" fontFamily={FONT} fontWeight="300">
+            <text x={x(pop)} y={H - 10} textAnchor="middle" fill={AXIS} fontSize={LABEL} fontFamily={FONT} fontWeight="300">
               {pop}
             </text>
           </g>
@@ -282,7 +283,7 @@ export function ResourceChart({
         {viablePop !== undefined && (
           <g>
             <line x1={x(viablePop)} x2={x(viablePop)} y1={pad.t} y2={H - pad.b} stroke={SKY} strokeWidth="1.5" />
-            <text x={x(viablePop) + 6} y={pad.t + 12} fill={SKY} fontSize="11" fontFamily={FONT} fontWeight="300">
+            <text x={x(viablePop) + 6} y={pad.t + 12} fill={SKY} fontSize={LABEL} fontFamily={FONT} fontWeight="300">
               800f / 200g
             </text>
           </g>
@@ -295,7 +296,7 @@ export function ResourceChart({
               y={mark.textY}
               textAnchor={mark.anchor}
               fill={mark.color}
-              fontSize="11"
+              fontSize={LABEL}
               fontFamily={FONT}
               fontWeight="300"
             >
@@ -306,7 +307,7 @@ export function ResourceChart({
         {hover && (
           <line x1={hover.x} x2={hover.x} y1={pad.t} y2={H - pad.b} stroke={INK} strokeOpacity="0.35" />
         )}
-        <text x={(pad.l + W - pad.r) / 2} y={H - 1} textAnchor="middle" fill={AXIS} fontSize="11" fontFamily={FONT} fontWeight="300">
+        <text x={(pad.l + W - pad.r) / 2} y={H - 1} textAnchor="middle" fill={AXIS} fontSize={LABEL} fontFamily={FONT} fontWeight="300">
           Villagers
         </text>
       </svg>

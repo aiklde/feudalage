@@ -22,7 +22,7 @@ import {
   type UnitId,
 } from "./model";
 
-const JOBS: Job[] = ["food", "wood", "gold", "idle"];
+const JOBS: Job[] = ["food", "wood", "gold"];
 
 function Stepper({
   label,
@@ -378,7 +378,7 @@ export function App() {
               <strong>{(input.doubleBit ? GATHER_RATES.woodAxe : GATHER_RATES.wood).toFixed(2)}/s</strong>
               <em>
                 {(GATHER_RATES.wood * 60).toFixed(1)}/min
-                {input.doubleBit ? ` → ${(GATHER_RATES.woodAxe * 60).toFixed(1)}/min after axe` : ""}
+                {input.doubleBit ? ` → ${(GATHER_RATES.woodAxe * 60).toFixed(1)}/min after DBA` : ""}
               </em>
             </div>
             <div>
@@ -453,24 +453,16 @@ export function App() {
           </div>
         </section>
 
-        <section className="notes">
-          <ul className="note-list">
-            {result.milestones.map((m) => (
-              <li key={`${m.t}-${m.label}`}>
-                <span>{m.label}</span>
-                <b>{gameClock(m.t, opening)}</b>
-              </li>
-            ))}
-          </ul>
-          <div className="mix">
-            <Mix label="Food" color="var(--food)" n={result.final.foodVils} total={totalVils} />
-            <Mix label="Wood" color="var(--wood)" n={result.final.woodVils} total={totalVils} />
-            <Mix label="Gold" color="var(--gold)" n={result.final.goldVils} total={totalVils} />
-            <Mix label="Idle" color="#7a7268" n={result.final.idleVils} total={totalVils} />
-            <p className="chart-caption">
-              {totalVils} villagers at the end of the window. {result.vilsProduced} trained after the click.
-            </p>
-          </div>
+        <section className="mix">
+          <Mix label="Food" color="var(--food)" n={result.final.foodVils} total={totalVils} />
+          <Mix label="Wood" color="var(--wood)" n={result.final.woodVils} total={totalVils} />
+          <Mix label="Gold" color="var(--gold)" n={result.final.goldVils} total={totalVils} />
+          {result.final.idleVils > 0 && (
+            <Mix label="Idle" color="var(--idle)" n={result.final.idleVils} total={totalVils} />
+          )}
+          <p className="chart-caption">
+            {totalVils} villagers at the end of the window. {result.vilsProduced} trained after the click.
+          </p>
         </section>
 
         <section className="help">

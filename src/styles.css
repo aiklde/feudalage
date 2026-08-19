@@ -410,7 +410,7 @@ b {
 }
 
 .hover-readout {
-  font-size: 11px;
+  font-size: 9px;
   color: var(--muted);
   margin-top: 12px;
 }
@@ -463,10 +463,6 @@ b {
   color: var(--gold);
   background: var(--gold-dim);
 }
-.brush[data-on="true"][data-job="idle"] {
-  color: var(--ink);
-  background: #2a2a2a;
-}
 
 .strip {
   display: grid;
@@ -510,37 +506,11 @@ b {
   color: var(--muted);
 }
 
-.notes {
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
-  gap: 48px;
-}
-
-.note-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.note-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.note-list b {
-  color: var(--ink);
-}
-
 .mix {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
+  max-width: 320px;
 }
 
 .mix-row {
