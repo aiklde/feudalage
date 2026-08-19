@@ -181,6 +181,7 @@ b {
   cursor: pointer;
   color: var(--muted);
   text-align: left;
+  align-self: flex-start;
 }
 
 .ghost:hover {
